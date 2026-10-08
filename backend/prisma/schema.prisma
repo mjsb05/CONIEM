@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EventStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum RegistrationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum ActivityType {
+  WORKSHOP
+  CONFERENCE
+}
+
+enum ActivityStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+}
+
+model Event {
+  id        String      @id @default(uuid()) @db.Uuid
+  name      String
+  timeZone  String
+  startsAt  DateTime?   @db.Timestamptz(3)
+  endsAt    DateTime?   @db.Timestamptz(3)
+  status    EventStatus @default(DRAFT)
+  createdAt DateTime    @default(now()) @db.Timestamptz(3)
+
+  participants EventParticipant[]
+  sessions     ActivitySession[]
+
+  @@index([status])
+}
+
+model Student {
+  id        String   @id @default(uuid()) @db.Uuid
+  fullName  String
+  matricula String   @unique
+  nfcUid    String   @unique
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  eventRegistrations EventParticipant[]
+}
+
+model EventParticipant {
+  id           String             @id @default(uuid()) @db.Uuid
+  eventId      String             @db.Uuid
+  studentId    String             @db.Uuid
+  status       RegistrationStatus @default(ACTIVE)
+  registeredAt DateTime           @default(now()) @db.Timestamptz(3)
+  archivedAt   DateTime?          @db.Timestamptz(3)
+
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  student     Student     @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  attendances Attendance[]
+
+  @@unique([eventId, studentId])
+  @@index([eventId, status])
+}
+
+model ActivitySession {
+  id        String         @id @default(uuid()) @db.Uuid
+  eventId   String         @db.Uuid
+  name      String
+  type      ActivityType
+  startsAt  DateTime       @db.Timestamptz(3)
+  endsAt    DateTime       @db.Timestamptz(3)
+  capacity  Int?
+  status    ActivityStatus @default(SCHEDULED)
+  createdAt DateTime       @default(now()) @db.Timestamptz(3)
+
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  attendances Attendance[]
+
+  @@index([eventId, type, startsAt])
+}
+
+model Attendance {
+  id                 String   @id @default(uuid()) @db.Uuid
+  eventParticipantId String   @db.Uuid
+  activitySessionId  String   @db.Uuid
+  enteredAt          DateTime @default(now()) @db.Timestamptz(3)
+  exitedAt           DateTime? @db.Timestamptz(3)
+
+  eventParticipant EventParticipant @relation(fields: [eventParticipantId], references: [id], onDelete: Restrict)
+  activitySession  ActivitySession  @relation(fields: [activitySessionId], references: [id], onDelete: Restrict)
+  mealEntitlement  MealEntitlement?
+
+  @@unique([eventParticipantId, activitySessionId])
+  @@index([activitySessionId, enteredAt])
+  @@index([eventParticipantId, exitedAt])
+}
+
+model MealEntitlement {
+  id           String   @id @default(uuid()) @db.Uuid
+  attendanceId String   @unique @db.Uuid
+  issuedAt     DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt    DateTime @db.Timestamptz(3)
+  redeemedAt   DateTime? @db.Timestamptz(3)
+
+  attendance Attendance @relation(fields: [attendanceId], references: [id], onDelete: Restrict)
+
+  @@index([expiresAt, redeemedAt])
+}
+
+model StaffUser {
+  id           String   @id @default(uuid()) @db.Uuid
+  username     String   @unique
+  passwordHash String
+  role         UserRole
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  auditLogs AuditLog[]
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @db.Uuid
+  action     String
+  entityType String
+  entityId   String
+  beforeData Json?
+  afterData  Json?
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  actor StaffUser? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+}
