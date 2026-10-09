@@ -1,6 +1,11 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateEventDto } from './dto/create-event.dto.js';
+import { CreateSessionDto } from './dto/create-session.dto.js';
 
 @Injectable()
 export class EventsService {
@@ -43,6 +48,48 @@ export class EventsService {
         timeZone: createEventDto.timeZone,
         ...(startsAt && { startsAt }),
         ...(endsAt && { endsAt }),
+      },
+    });
+  }
+
+  async createSession(eventId: string, createSessionDto: CreateSessionDto) {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) {
+      throw new NotFoundException('No se encontró el evento');
+    }
+
+    const startsAt = new Date(createSessionDto.startsAt);
+    const endsAt = new Date(createSessionDto.endsAt);
+
+    if (startsAt >= endsAt) {
+      throw new BadRequestException(
+        'El inicio de la sesión debe ser anterior a su fin',
+      );
+    }
+
+    if (event.startsAt && startsAt < event.startsAt) {
+      throw new BadRequestException(
+        'La sesión no puede iniciar antes que el evento',
+      );
+    }
+
+    if (event.endsAt && endsAt > event.endsAt) {
+      throw new BadRequestException(
+        'La sesión no puede terminar después que el evento',
+      );
+    }
+
+    return this.prisma.activitySession.create({
+      data: {
+        eventId,
+        name: createSessionDto.name,
+        type: createSessionDto.type,
+        startsAt,
+        endsAt,
+        capacity: createSessionDto.type === 'WORKSHOP' ? 35 : null,
       },
     });
   }
