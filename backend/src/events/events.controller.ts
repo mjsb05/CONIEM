@@ -12,6 +12,7 @@ import { Roles } from '../auth/roles.decorator.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import { CreateEventDto } from './dto/create-event.dto.js';
 import { CreateSessionDto } from './dto/create-session.dto.js';
+import { RegisterParticipantDto } from './dto/register-participant.dto.js';
 import { EventsService } from './events.service.js';
 
 @Controller('events')
@@ -38,5 +39,13 @@ export class EventsController {
     @Body() createSessionDto: CreateSessionDto,
   ) {
     return this.eventsService.createSession(eventId, createSessionDto);
+  }
+
+  @Post(':eventId/participants')
+  registerParticipant(
+    @Param('eventId', ParseUUIDPipe) eventId: string,
+    @Body() registerDto: RegisterParticipantDto,
+  ) {
+    return this.eventsService.registerParticipant(eventId, registerDto);
   }
 }
